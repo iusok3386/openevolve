@@ -1,0 +1,140 @@
+# General settings
+max_iterations: 1000 # Maximum number of evolution iterations
+checkpoint_interval: 20 # Save checkpoints every N iterations
+log_level: "INFO" # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+log_dir: null # Custom directory for logs (default: output_dir/logs)
+random_seed: null # Random seed for reproducibility (null = random)
+
+# Evolution settings
+diff_based_evolution: true # Use diff-based evolution (true) or full rewrites (false)
+allow_full_rewrites: false # Allow occasional full rewrites even in diff-based mode
+max_code_length: 10000 # Maximum allowed code length in characters
+
+# LLM configuration
+llm:
+  # Models for evolution
+  models:
+    # List of available models with their weights
+    - name: "gemini-2.0-flash-lite"
+      weight: 0.40
+    - name: "gemini-2.0-flash"
+      weight: 0.30
+    - name: "gemini-2.5-flash-preview-05-20"
+      weight: 0.30
+
+  evaluator_models:
+    - name: "gemini-2.0-flash-lite"
+      weight: 0.40
+    - name: "gemini-2.0-flash"
+      weight: 0.30
+    - name: "gemini-2.5-flash-preview-05-20"
+      weight: 0.30
+
+  # API configuration
+  api_base: "https://generativelanguage.googleapis.com/v1beta/openai/" # Base URL for API (change for non-OpenAI models)
+  api_key: null # API key (defaults to OPENAI_API_KEY env variable)
+
+  # Generation parameters
+  temperature: 0.7 # Temperature for generation (higher = more creative)
+  top_p: 0.95 # Top-p sampling parameter
+  max_tokens: 4096 # Maximum tokens to generate
+
+  # Request parameters
+  timeout: 60 # Timeout for API requests in seconds
+  retries: 3 # Number of retries for failed requests
+  retry_delay: 5 # Delay between retries in seconds
+
+# Prompt configuration
+prompt:
+  template_dir: null # Custom directory for prompt templates
+  system_message: |
+    You are an expert Python programmer developing an AI for a Snake game.
+    Your task is to improve the `decide_next_move` function to maximize the snake's final length (score).
+
+    The function receives the current game state:
+    - `snake_body`: A deque of (x, y) tuples. `snake_body[0]` is the head.
+    - `snake_direction`: The current move direction as a (dx, dy) tuple.
+    - `apple_pos`: The (x, y) tuple of the apple.
+    - `obstacles`: A set of (x, y) tuples for obstacles.
+    - `width`, `height`: The board dimensions.
+
+    A superior strategy involves not just moving towards the apple, but critically, avoiding collisions with walls, obstacles, and the snake's own body.
+    Advanced strategies might involve looking ahead, planning paths to avoid getting trapped, or moving to safer areas even if it's not the shortest path to the apple.
+    You must return one of the four valid directions: (0, -1) for UP, (0, 1) for DOWN, (-1, 0) for LEFT, or (1, 0) for RIGHT.
+  evaluator_system_message: |
+    You are an expert code reviewer specializing in game AI. Your task is to analyze a Python function that decides a snake's next move.
+
+    Evaluate the submitted strategy based on the following criteria on a scale of 1 to 10, where 1 is poor and 10 is excellent.
+    1.  **Correctness and Safety (Weight: 50%)**: Does the code reliably prevent immediate collisions with walls, obstacles, and its own body? Is it robust against edge cases?
+    2.  **Strategic Foresight (Weight: 40%)**: Does the logic show any signs of "thinking ahead"? Does it avoid moving into spaces where it could easily get trapped later, even if it's a short-term optimal move? A simple "move towards apple" logic is a low score. Logic that seems to map out safe areas or avoid dead ends is a high score.
+    3.  **Readability and Simplicity (Weight: 10%)**: Is the code clean, well-commented, and easy to understand?
+
+    You MUST respond ONLY with a JSON object containing your reasoning and a final weighted score. Example:
+    {
+      "reasoning": "The code correctly avoids immediate collisions but lacks any strategic foresight, leading it into simple traps. It's a basic reactive AI.",
+      "final_score": 4.5
+    }
+
+  # Number of examples to include in the prompt
+  num_top_programs: 3 # Number of top-performing programs to include
+  num_diverse_programs: 2 # Number of diverse programs to include
+
+  # Template stochasticity
+  use_template_stochasticity: true # Use random variations in templates for diversity
+
+  # Artifacts Channel
+  include_artifacts: true
+  max_artifact_bytes: 4096 # 4KB limit in prompts
+  artifact_security_filter: true
+
+database:
+  # General settings
+  db_path: null # Path to persist database (null = in-memory only)
+  in_memory: true # Keep database in memory for faster access
+
+  # Evolutionary parameters
+  population_size: 1000 # Maximum number of programs to keep in memory
+  archive_size: 100 # Size of elite archive
+  num_islands: 5 # Number of islands for island model (separate populations)
+
+  # Island-based evolution parameters
+  # Islands provide diversity by maintaining separate populations that evolve independently.
+  # Migration periodically shares the best solutions between adjacent islands.
+  migration_interval: 50 # Migrate between islands every N generations
+  migration_rate: 0.1 # Fraction of top programs to migrate (0.1 = 10%)
+
+  # Selection parameters
+  elite_selection_ratio: 0.1 # Ratio of elite programs to select
+  exploration_ratio: 0.2 # Ratio of exploration vs exploitation
+  exploitation_ratio: 0.7 # Ratio of exploitation vs random selection
+  # Note: diversity_metric is fixed to "edit_distance" (feature_based not implemented)
+
+  # Feature map dimensions for MAP-Elites
+  feature_dimensions: # Dimensions for MAP-Elites feature map
+    - "score" # Performance score
+    - "complexity" # Code complexity (length)
+  feature_bins: 10 # Number of bins per dimension
+
+# Evaluator configuration
+evaluator:
+  # General settings
+  timeout: 300 # Maximum evaluation time in seconds
+  max_retries: 3 # Maximum number of retries for evaluation
+
+  # Note: resource limits (memory_limit_mb, cpu_limit) are not yet implemented
+
+  # Evaluation strategies
+  cascade_evaluation: true # Use cascade evaluation to filter bad solutions early
+  cascade_thresholds: # Thresholds for advancing to next evaluation stage
+    - 0.5 # First stage threshold
+    - 0.75 # Second stage threshold
+    - 0.9 # Third stage threshold
+
+  # Parallel evaluation
+  parallel_evaluations: 4 # Number of parallel evaluations
+  # Note: distributed evaluation is not yet implemented
+
+  # LLM-based feedback (experimental)
+  use_llm_feedback: false # Use LLM to evaluate code quality
+  llm_feedback_weight: 0.1 # Weight for LLM feedback in final score
+  enable_artifacts: true
